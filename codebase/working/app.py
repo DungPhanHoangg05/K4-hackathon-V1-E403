@@ -1,16 +1,19 @@
 """
 app.py — VLearn AI Companion backend
 
-Chạy: 
+Chạy từ thư mục gốc dự án:
     export GEMINI_API_KEY="..."
     pip install -r requirements.txt
+    python codebase/working/app.py
+
+Hoặc chạy trực tiếp từ codebase/working:
     python app.py
 
 Endpoints:
-    GET  /                          -> phục vụ index.html
-    GET  /api/library               -> thư viện slide THẬT, đọc từ data/vlearn-pack/slides
-    GET  /api/library/refresh       -> quét lại thư mục slide (bỏ cache)
-    POST /api/chat                  -> hỏi đáp / tóm tắt, có gọi Gemini với ngữ cảnh slide thật
+    GET  /                         -> phục vụ index.html
+    GET  /api/library              -> thư viện slide THẬT, đọc từ data/vlearn-pack/slides
+    GET  /api/library/refresh      -> quét lại thư mục slide (bỏ cache)
+    POST /api/chat                 -> hỏi đáp / tóm tắt, có gọi Gemini với ngữ cảnh slide thật
 """
 
 import os
@@ -20,22 +23,31 @@ import logging
 from pathlib import Path
 
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, send_file, abort
 import google.generativeai as genai
 
-load_dotenv()  # đọc GEMINI_API_KEY (và các biến khác) từ file .env cạnh app.py
+# Định vị thư mục:
+# WORKING_DIR = codebase/working
+# PROJECT_ROOT = thư mục gốc dự án (chứa prompts/, data/, ...)
+WORKING_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = WORKING_DIR.parent.parent
 
-from codebase.working.slide_index import build_library, find_file, get_page, get_page_range
-from flask import send_file, abort
+# Load .env từ gốc dự án hoặc thư mục làm việc
+load_dotenv(PROJECT_ROOT / ".env")
+load_dotenv(WORKING_DIR / ".env")
+
+# Import module slide_index nằm cùng thư mục codebase/working
+from slide_index import build_library, find_file, get_page, get_page_range
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("vlearn")
 
-APP_ROOT = Path(__file__).resolve().parent
-WEB_ROOT = APP_ROOT / "codebase" / "working"
+WEB_ROOT = WORKING_DIR
+
 PROMPT_CANDIDATES = [
-    APP_ROOT / "prompts" / "system_prompt.txt",
-    APP_ROOT / "prompts" / "system_prompt",
+    PROJECT_ROOT / "prompts" / "system_prompt.txt",
+    PROJECT_ROOT / "prompts" / "system_prompt",
+    WORKING_DIR / "prompts" / "system_prompt.txt",
 ]
 PROMPT_PATH = next((p for p in PROMPT_CANDIDATES if p.exists()), PROMPT_CANDIDATES[0])
 
@@ -103,7 +115,7 @@ def api_file_raw(file_id):
 # Lịch sử hội thoại — lưu theo từng file_id, mỗi cuộc trò chuyện 1 bản ghi.
 # --------------------------------------------------------------------------
 
-CONV_DIR = APP_ROOT / "data" / "vlearn-pack" / ".conversations"
+CONV_DIR = PROJECT_ROOT / "data" / "vlearn-pack" / ".conversations"
 
 
 def _conv_path(conv_id: str) -> Path:
@@ -187,26 +199,16 @@ def _looks_like_test_answer_request(text: str) -> bool:
     return any(re.search(p, low) for p in TEST_ANSWER_PATTERNS)
 
 
-# Bắt phạm vi trang viết thẳng trong câu hỏi, ví dụ:
-#   "tóm tắt từ trang 3 đến trang 7", "tóm tắt trang 3-7", "slide 3 tới 7", "page 3 to 7"
 PAGE_RANGE_PATTERNS = [
     r"(?:từ\s*)?(?:trang|slide|page|tr\.?)\s*(\d+)\s*(?:-|–|—|đến|den|tới|toi|->|to)\s*(?:trang|slide|page|tr\.?)?\s*(\d+)",
     r"\b(\d+)\s*(?:-|–|—)\s*(\d+)\b",
 ]
-# Một trang đơn: "tóm tắt trang 5", "giải thích slide 12"
 PAGE_SINGLE_PATTERN = r"(?:trang|slide|page|tr\.?)\s*(\d+)"
-# "tóm tắt toàn bộ / cả file / tất cả các trang"
 WHOLE_DOC_KEYWORDS = ["toàn bộ", "toan bo", "cả bài", "ca bai", "cả file", "ca file",
                       "tất cả", "tat ca", "whole", "entire", "all pages", "cả tài liệu"]
 
 
 def _parse_page_scope(text: str):
-    """
-    Đọc phạm vi trang ngay trong câu hỏi của học viên.
-
-    Trả về (page_from, page_to, wants_whole_doc). Các giá trị là None nếu
-    câu hỏi không nhắc tới trang nào.
-    """
     low = (text or "").lower()
 
     for pattern in PAGE_RANGE_PATTERNS:
@@ -227,12 +229,6 @@ def _parse_page_scope(text: str):
 
 
 def _is_scope_ambiguous(text: str, file_id: str) -> bool:
-    """
-    Chỉ hỏi lại khi thực sự không biết phải đọc tài liệu nào.
-
-    Phạm vi trang không còn là lý do để hỏi lại: nó được suy ra từ UI, từ chính
-    câu hỏi (_parse_page_scope), hoặc mặc định là toàn bộ tài liệu.
-    """
     has_summary_intent = any(k in (text or "").lower() for k in SUMMARY_KEYWORDS)
     return has_summary_intent and not file_id
 
@@ -245,14 +241,13 @@ def api_chat():
     page = body.get("page")
     page_from = body.get("page_from")
     page_to = body.get("page_to")
-    history = body.get("history") or []  # [{role: "user"|"model", text: "..."}]
+    history = body.get("history") or []
 
     if not message:
         return jsonify({"error": "Thiếu 'message'."}), 400
 
     lib = build_library()
 
-    # 1) Chặn yêu cầu đáp án bài kiểm tra / gian lận học thuật — không cần gọi model.
     if _looks_like_test_answer_request(message):
         return jsonify({
             "reply": (
@@ -266,8 +261,6 @@ def api_chat():
             "blocked_reason": "academic_integrity",
         })
 
-    # 2) Phạm vi chưa rõ -> hỏi lại thay vì đoán.
-    #    Chỉ còn hỏi lại khi chưa biết TÀI LIỆU nào; số trang thì tự suy ra bên dưới.
     if _is_scope_ambiguous(message, file_id):
         clarification = _build_clarification_question(lib, message)
         return jsonify({
@@ -276,7 +269,6 @@ def api_chat():
             "needs_clarification": True,
         })
 
-    # 3) Nếu file_id không tồn tại trong thư viện thật -> báo lỗi rõ ràng, không bịa.
     if file_id:
         _, f = find_file(lib, file_id)
         if not f:
@@ -289,7 +281,6 @@ def api_chat():
                 "needs_clarification": True,
             })
 
-    # 4) Dựng ngữ cảnh slide thật cho model.
     context_pages, context_label = _gather_context(
         lib, file_id, page, page_from, page_to, message=message
     )
@@ -331,14 +322,6 @@ MAX_PAGES_FALLBACK = int(os.environ.get("VLEARN_MAX_PAGES_FALLBACK", "40"))
 
 
 def _gather_context(lib, file_id, page, page_from, page_to, message=""):
-    """
-    Trả về (list[page_dict], label) — TOÀN BỘ text lấy thật từ slide, không sinh thêm.
-
-    Thứ tự ưu tiên khi xác định phạm vi trang:
-      1. Ô chọn trang trên UI (page_from/page_to, hoặc page).
-      2. Số trang viết thẳng trong câu hỏi ("tóm tắt từ trang 3 đến trang 7").
-      3. Mặc định: toàn bộ tài liệu (cắt bớt theo MAX_PAGES_FALLBACK / MAX_CONTEXT_CHARS).
-    """
     if not file_id:
         return [], ""
 
@@ -346,10 +329,7 @@ def _gather_context(lib, file_id, page, page_from, page_to, message=""):
     if not f:
         return [], ""
 
-    # (2) Nếu UI không cấp trang, đọc phạm vi từ chính câu hỏi.
     if not page_from and not page_to and not page:
-        # wants_whole_doc: học viên nói "toàn bộ/cả bài" -> để rơi xuống nhánh mặc định
-        # (cả tài liệu), giống như khi không nhắc gì tới trang.
         page_from, page_to, _ = _parse_page_scope(message)
 
     if page_from and page_to:
@@ -365,7 +345,6 @@ def _gather_context(lib, file_id, page, page_from, page_to, message=""):
         pages = [p] if p else []
         label = f"{f['name']} — trang {page}"
     else:
-        # (3) Không ai nói gì về trang -> đưa cả tài liệu làm ngữ cảnh.
         pages = f["pages"][:MAX_PAGES_FALLBACK]
         if pages:
             label = f"{f['name']} — trang {pages[0]['page']}–{pages[-1]['page']}"
@@ -472,7 +451,6 @@ CHỈ trả về JSON hợp lệ theo đúng schema sau, không kèm markdown, k
 
 
 def _extract_json(raw: str):
-    """Model đôi khi bọc JSON trong ```json ... ``` hoặc kèm lời dẫn — gỡ ra."""
     if not raw:
         return None
     text = raw.strip()
@@ -483,7 +461,6 @@ def _extract_json(raw: str):
         return json.loads(text)
     except Exception:
         pass
-    # Fallback: lấy khối {...} ngoài cùng
     start, end = text.find("{"), text.rfind("}")
     if start != -1 and end > start:
         try:
@@ -494,7 +471,6 @@ def _extract_json(raw: str):
 
 
 def _normalize_answer_index(value, options):
-    """Chấp nhận answer_index dạng số (0-based/1-based) hoặc chữ cái 'A'-'D'."""
     if isinstance(value, str):
         v = value.strip()
         if len(v) == 1 and v.upper() in "ABCD":
@@ -507,17 +483,12 @@ def _normalize_answer_index(value, options):
         return None
     if 0 <= value < len(options):
         return value
-    # Một số model trả 1-based
     if 1 <= value <= len(options):
         return value - 1
     return None
 
 
 def _validate_quiz(data, valid_pages):
-    """
-    Lọc bỏ câu hỏi méo mó (thiếu option, đáp án ngoài phạm vi, trang không có thật).
-    Trả về list câu hỏi sạch — thà ít câu còn hơn hiển thị câu hỏng.
-    """
     if not isinstance(data, dict):
         return []
     raw_questions = data.get("questions")
@@ -544,7 +515,7 @@ def _validate_quiz(data, valid_pages):
         except (TypeError, ValueError):
             page = None
         if page not in valid_pages:
-            page = None  # không bịa trích dẫn trang không có trong ngữ cảnh
+            page = None
         cleaned.append({
             "question": text,
             "options": options,
@@ -625,7 +596,6 @@ def api_quiz():
             "error": "Mình không tìm thấy tài liệu này trong thư viện slide hiện có.",
         }), 404
 
-    # Mặc định quiz lấy từ TOÀN BỘ tài liệu; nếu học viên đã chọn phạm vi trang thì tôn trọng.
     context_pages, context_label = _gather_context(lib, file_id, page, page_from, page_to)
 
     if not context_pages:
