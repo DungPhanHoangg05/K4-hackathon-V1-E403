@@ -208,6 +208,68 @@
     background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent);
     border-radius: 6px; padding: 6px 10px; font-size: 11.5px; cursor: pointer; white-space: nowrap;
   }
+  #quiz-btn {
+    background: rgba(62,207,142,0.14); color: var(--good); border: 1px solid var(--good);
+    border-radius: 6px; padding: 6px 10px; font-size: 11.5px; cursor: pointer; white-space: nowrap;
+  }
+  #quiz-btn:disabled { opacity: .45; cursor: default; }
+
+  /* ---- Quiz kiểm tra hiểu bài ---- */
+  .quiz-card {
+    background: var(--panel-2); border: 1px solid var(--good);
+    border-radius: 12px; padding: 12px 13px;
+  }
+  .quiz-card .quiz-head {
+    display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px;
+    padding-bottom: 9px; border-bottom: 1px solid var(--line);
+  }
+  .quiz-card .quiz-head .qh-title { font-weight: 700; font-size: 13.5px; color: var(--good); }
+  .quiz-card .quiz-head .qh-sub { font-size: 11px; color: var(--muted); }
+  .quiz-q { margin-bottom: 14px; }
+  .quiz-q:last-of-type { margin-bottom: 8px; }
+  .quiz-q .q-text { font-size: 13.3px; line-height: 1.45; margin-bottom: 7px; font-weight: 500; }
+  .quiz-q .q-text .q-num {
+    display: inline-block; min-width: 19px; height: 19px; line-height: 19px; text-align: center;
+    background: var(--accent-soft); color: var(--accent); border-radius: 5px;
+    font-size: 11px; font-weight: 700; margin-right: 6px;
+  }
+  .quiz-opt {
+    display: flex; align-items: flex-start; gap: 8px; padding: 7px 9px; margin-bottom: 5px;
+    border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
+    font-size: 12.8px; line-height: 1.4; background: var(--bg); transition: border-color .12s, background .12s;
+  }
+  .quiz-opt:hover { border-color: var(--accent); }
+  .quiz-opt input { margin: 2px 0 0; accent-color: var(--accent); flex-shrink: 0; }
+  .quiz-opt .opt-key { font-weight: 700; color: var(--muted); flex-shrink: 0; }
+  .quiz-opt.picked { border-color: var(--accent); background: var(--accent-soft); }
+  /* Sau khi nộp bài */
+  .quiz-card.graded .quiz-opt { cursor: default; }
+  .quiz-card.graded .quiz-opt:hover { border-color: var(--line); }
+  .quiz-opt.correct { border-color: var(--good); background: rgba(62,207,142,0.13); }
+  .quiz-opt.correct:hover { border-color: var(--good); }
+  .quiz-opt.wrong { border-color: #e06a6a; background: rgba(224,106,106,0.13); }
+  .quiz-opt.wrong:hover { border-color: #e06a6a; }
+  .quiz-opt .opt-mark { margin-left: auto; font-size: 11.5px; font-weight: 700; flex-shrink: 0; }
+  .quiz-explain {
+    margin-top: 6px; font-size: 11.8px; line-height: 1.5; color: var(--muted);
+    border-left: 2px solid var(--line); padding: 2px 0 2px 9px; display: none;
+  }
+  .quiz-card.graded .quiz-explain { display: block; }
+  .quiz-explain b { color: var(--ink); }
+  .quiz-actions { display: flex; align-items: center; gap: 9px; margin-top: 12px; }
+  .quiz-actions button {
+    background: var(--good); color: #08130d; border: none; border-radius: 8px;
+    padding: 8px 15px; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+  .quiz-actions button.secondary {
+    background: var(--panel-2); color: var(--ink); border: 1px solid var(--line); font-weight: 500;
+  }
+  .quiz-actions button.secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .quiz-actions button:disabled { opacity: .45; cursor: default; }
+  .quiz-score { font-size: 12.5px; font-weight: 600; }
+  .quiz-score .sc-num { color: var(--good); }
+  .quiz-score.low .sc-num { color: var(--warn); }
+  .quiz-warn { font-size: 11.8px; color: var(--warn); margin-top: 8px; display: none; }
 
   #chat { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
   .msg { max-width: 100%; }
@@ -317,6 +379,7 @@
       </div>
       <div class="row2">
         <div id="scope-current">Chưa chọn tài liệu nào.</div>
+        <button id="quiz-btn" title="Tạo 5 câu trắc nghiệm từ tóm tắt nội dung slide">📝 Tạo quiz</button>
         <button id="whole-doc-btn" title="Đặt phạm vi = toàn bộ tài liệu">Toàn bộ slide</button>
       </div>
     </div>
@@ -505,6 +568,7 @@ async function selectFile(f) {
   pageFromEl.value = '';
   pageToEl.value = '';
   updateScopeLabel();
+  updateQuizBtn();  // có tài liệu -> cho phép tạo quiz
   tbFileName.textContent = f.name;
   tbFileSub.textContent = `${f.page_count} trang · slide PDF`;
 
@@ -671,6 +735,217 @@ function clearEmptyChat() {
   const emptyState = chatEl.querySelector('.empty-chat');
   if (emptyState) emptyState.remove();
 }
+
+// ---------------------------------------------------------------------------
+// Quiz kiểm tra hiểu bài — render trong luồng chat, chấm điểm ngay ở client.
+// ---------------------------------------------------------------------------
+
+const OPT_KEYS = ['A', 'B', 'C', 'D', 'E', 'F'];
+const quizBtn = el('quiz-btn');
+
+function updateQuizBtn() {
+  quizBtn.disabled = !state.fileId;
+}
+
+function renderQuiz(quiz, label) {
+  const card = document.createElement('div');
+  card.className = 'quiz-card';
+
+  const head = document.createElement('div');
+  head.className = 'quiz-head';
+  const total = quiz.questions.length;
+  head.innerHTML = `<span class="qh-title">Kiểm tra hiểu bài</span>`;
+  const sub = document.createElement('span');
+  sub.className = 'qh-sub';
+  sub.textContent = `${total} câu · ${label || ''}`;
+  head.appendChild(sub);
+  card.appendChild(head);
+
+  // Khai báo trước vòng lặp: handler chọn đáp án bên dưới có tham chiếu tới `warn`.
+  const warn = document.createElement('div');
+  warn.className = 'quiz-warn';
+  warn.textContent = 'Bạn hãy trả lời hết các câu trước khi nộp nhé.';
+
+  quiz.questions.forEach((q, qi) => {
+    const qDiv = document.createElement('div');
+    qDiv.className = 'quiz-q';
+
+    const qText = document.createElement('div');
+    qText.className = 'q-text';
+    const num = document.createElement('span');
+    num.className = 'q-num';
+    num.textContent = qi + 1;
+    qText.appendChild(num);
+    qText.appendChild(document.createTextNode(q.question));
+    qDiv.appendChild(qText);
+
+    q.options.forEach((opt, oi) => {
+      const lab = document.createElement('label');
+      lab.className = 'quiz-opt';
+      lab.dataset.qi = qi;
+      lab.dataset.oi = oi;
+
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = `quiz-q-${qi}-${state.quizSeq}`;
+      radio.value = oi;
+
+      const key = document.createElement('span');
+      key.className = 'opt-key';
+      key.textContent = OPT_KEYS[oi] + '.';
+
+      const txt = document.createElement('span');
+      txt.textContent = opt;
+
+      lab.append(radio, key, txt);
+
+      radio.addEventListener('change', () => {
+        if (card.classList.contains('graded')) return;
+        qDiv.querySelectorAll('.quiz-opt').forEach(o => o.classList.remove('picked'));
+        lab.classList.add('picked');
+        warn.style.display = 'none';
+      });
+
+      qDiv.appendChild(lab);
+    });
+
+    const explain = document.createElement('div');
+    explain.className = 'quiz-explain';
+    const pageRef = q.page ? `<b>Trang ${q.page}</b> — ` : '';
+    const answerTxt = `<b>Đáp án: ${OPT_KEYS[q.answer_index]}.</b> ${escapeHtml(q.options[q.answer_index])}`;
+    explain.innerHTML = `${pageRef}${answerTxt}${q.explanation ? '<br>' + escapeHtml(q.explanation) : ''}`;
+    qDiv.appendChild(explain);
+
+    card.appendChild(qDiv);
+  });
+
+  card.appendChild(warn);
+
+  const actions = document.createElement('div');
+  actions.className = 'quiz-actions';
+  const submitBtn = document.createElement('button');
+  submitBtn.type = 'button';
+  submitBtn.textContent = 'Nộp bài';
+  const score = document.createElement('div');
+  score.className = 'quiz-score';
+  actions.append(submitBtn, score);
+  card.appendChild(actions);
+
+  submitBtn.addEventListener('click', () => {
+    const picked = quiz.questions.map((_, qi) => {
+      const sel = card.querySelector(`input[name="quiz-q-${qi}-${state.quizSeq}"]:checked`);
+      return sel ? Number(sel.value) : null;
+    });
+
+    if (picked.some(p => p === null)) {
+      warn.style.display = 'block';
+      return;
+    }
+    warn.style.display = 'none';
+
+    let correct = 0;
+    quiz.questions.forEach((q, qi) => {
+      if (picked[qi] === q.answer_index) correct++;
+      card.querySelectorAll(`.quiz-opt[data-qi="${qi}"]`).forEach(lab => {
+        const oi = Number(lab.dataset.oi);
+        lab.classList.remove('picked');
+        lab.querySelector('input').disabled = true;
+        if (oi === q.answer_index) {
+          lab.classList.add('correct');
+          lab.insertAdjacentHTML('beforeend', '<span class="opt-mark" style="color:var(--good)">✓ Đúng</span>');
+        } else if (oi === picked[qi]) {
+          lab.classList.add('wrong');
+          lab.insertAdjacentHTML('beforeend', '<span class="opt-mark" style="color:#e06a6a">✕ Bạn chọn</span>');
+        }
+      });
+    });
+
+    card.classList.add('graded');
+    submitBtn.disabled = true;
+    const pct = Math.round((correct / quiz.questions.length) * 100);
+    score.classList.toggle('low', pct < 60);
+    score.innerHTML = `Kết quả: <span class="sc-num">${correct}/${quiz.questions.length}</span> (${pct}%) — ` +
+      (pct >= 80 ? 'bạn đã hiểu bài tốt!' : pct >= 60 ? 'khá ổn, xem lại phần sai nhé.' : 'nên xem lại slide phần này nhé.');
+
+    const retryBtn = document.createElement('button');
+    retryBtn.type = 'button';
+    retryBtn.className = 'secondary';
+    retryBtn.textContent = 'Tạo bộ mới';
+    retryBtn.addEventListener('click', () => generateQuiz());
+    actions.appendChild(retryBtn);
+
+    // Ghi vào lịch sử để model biết học viên vừa làm quiz và kết quả ra sao.
+    state.history.push({
+      role: 'model',
+      text: `[Quiz] Đã cho học viên làm ${quiz.questions.length} câu trắc nghiệm về ${label || 'tài liệu'}. Kết quả: ${correct}/${quiz.questions.length}.`,
+    });
+    if (!state.convId) state.convId = uid();
+    saveConversation();
+  });
+
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ai';
+  wrap.innerHTML = `<span class="tag">Quiz · Kiểm tra hiểu bài</span>`;
+  wrap.appendChild(card);
+  chatEl.appendChild(wrap);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s == null ? '' : String(s);
+  return d.innerHTML;
+}
+
+async function generateQuiz() {
+  if (!state.fileId) {
+    addAiMessage('Bạn hãy chọn một tài liệu trong thư viện bên trái trước khi tạo quiz nhé.', { clarify: true });
+    return;
+  }
+
+  state.quizSeq = (state.quizSeq || 0) + 1;
+  clearEmptyChat();
+  quizBtn.disabled = true;
+  const label = quizLabel();
+  addUserMessage(`Tạo quiz 5 câu để kiểm tra mình hiểu bài (${label})`);
+  addTyping();
+
+  try {
+    const res = await fetch('/api/quiz', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        file_id: state.fileId,
+        page_from: pageFromEl.value ? Number(pageFromEl.value) : null,
+        page_to: pageToEl.value ? Number(pageToEl.value) : null,
+        num_questions: 5,
+      }),
+    });
+    const data = await res.json();
+    removeTyping();
+
+    if (!res.ok || data.error) {
+      addAiMessage(data.error || 'Mình chưa tạo được quiz. Bạn thử lại nhé.', { clarify: true });
+      return;
+    }
+    renderQuiz(data.quiz, data.label || label);
+  } catch (err) {
+    removeTyping();
+    addAiMessage('Không kết nối được tới server. Kiểm tra app.py có đang chạy không.', { clarify: true });
+  } finally {
+    updateQuizBtn();
+  }
+}
+
+function quizLabel() {
+  const from = pageFromEl.value, to = pageToEl.value;
+  if (from && to) return `trang ${from}–${to}`;
+  if (from) return `từ trang ${from}`;
+  return 'toàn bộ tài liệu';
+}
+
+quizBtn.addEventListener('click', () => generateQuiz());
+updateQuizBtn();
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();

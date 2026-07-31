@@ -432,6 +432,226 @@ def _call_gemini(message, context_pages, context_label, history):
     return reply_text, citations
 
 
+# --------------------------------------------------------------------------
+# Quiz — sinh bộ câu hỏi trắc nghiệm từ tóm tắt nội dung slide
+# --------------------------------------------------------------------------
+
+QUIZ_NUM_QUESTIONS = int(os.environ.get("VLEARN_QUIZ_QUESTIONS", "5"))
+QUIZ_NUM_OPTIONS = 4
+
+QUIZ_INSTRUCTION = """
+Nhiệm vụ lần này: soạn một BỘ CÂU HỎI TRẮC NGHIỆM để kiểm tra xem học viên đã
+hiểu bài chưa.
+
+Cách làm:
+1. Trước hết hãy tóm tắt trong đầu các ý chính của TOÀN BỘ ngữ cảnh slide được cấp.
+2. Từ các ý chính đó, soạn đúng {n} câu hỏi trắc nghiệm, mỗi câu {k} lựa chọn.
+3. Câu hỏi phải trải đều các phần khác nhau của tài liệu, không dồn hết vào một trang.
+
+Ràng buộc bắt buộc:
+- CHỈ dùng thông tin có thật trong NGỮ CẢNH SLIDE. Không hỏi kiến thức ngoài slide.
+- Mỗi câu phải có ĐÚNG 1 đáp án đúng; 3 phương án còn lại phải sai rõ ràng nhưng
+  hợp lý (không phải đáp án "bẫy" vô nghĩa như "không có đáp án nào đúng").
+- Mỗi câu phải ghi "page" = số trang slide chứa thông tin để trả lời câu đó.
+- "explanation" giải thích ngắn (1-2 câu) vì sao đáp án đó đúng, dựa trên slide.
+- Viết bằng tiếng Việt.
+
+CHỈ trả về JSON hợp lệ theo đúng schema sau, không kèm markdown, không kèm lời dẫn:
+{{
+  "questions": [
+    {{
+      "question": "nội dung câu hỏi",
+      "options": ["phương án A", "phương án B", "phương án C", "phương án D"],
+      "answer_index": 0,
+      "explanation": "vì sao đáp án này đúng",
+      "page": 4
+    }}
+  ]
+}}
+"""
+
+
+def _extract_json(raw: str):
+    """Model đôi khi bọc JSON trong ```json ... ``` hoặc kèm lời dẫn — gỡ ra."""
+    if not raw:
+        return None
+    text = raw.strip()
+    fence = re.search(r"```(?:json)?\s*(.+?)\s*```", text, re.S)
+    if fence:
+        text = fence.group(1).strip()
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+    # Fallback: lấy khối {...} ngoài cùng
+    start, end = text.find("{"), text.rfind("}")
+    if start != -1 and end > start:
+        try:
+            return json.loads(text[start:end + 1])
+        except Exception:
+            return None
+    return None
+
+
+def _normalize_answer_index(value, options):
+    """Chấp nhận answer_index dạng số (0-based/1-based) hoặc chữ cái 'A'-'D'."""
+    if isinstance(value, str):
+        v = value.strip()
+        if len(v) == 1 and v.upper() in "ABCD":
+            return ord(v.upper()) - ord("A")
+        try:
+            value = int(v)
+        except ValueError:
+            return None
+    if not isinstance(value, int):
+        return None
+    if 0 <= value < len(options):
+        return value
+    # Một số model trả 1-based
+    if 1 <= value <= len(options):
+        return value - 1
+    return None
+
+
+def _validate_quiz(data, valid_pages):
+    """
+    Lọc bỏ câu hỏi méo mó (thiếu option, đáp án ngoài phạm vi, trang không có thật).
+    Trả về list câu hỏi sạch — thà ít câu còn hơn hiển thị câu hỏng.
+    """
+    if not isinstance(data, dict):
+        return []
+    raw_questions = data.get("questions")
+    if not isinstance(raw_questions, list):
+        return []
+
+    cleaned = []
+    for q in raw_questions:
+        if not isinstance(q, dict):
+            continue
+        text = (q.get("question") or "").strip()
+        options = q.get("options")
+        if not text or not isinstance(options, list):
+            continue
+        options = [str(o).strip() for o in options if str(o).strip()]
+        if len(options) != QUIZ_NUM_OPTIONS or len(set(options)) != QUIZ_NUM_OPTIONS:
+            continue
+        idx = _normalize_answer_index(q.get("answer_index"), options)
+        if idx is None:
+            continue
+        page = q.get("page")
+        try:
+            page = int(page)
+        except (TypeError, ValueError):
+            page = None
+        if page not in valid_pages:
+            page = None  # không bịa trích dẫn trang không có trong ngữ cảnh
+        cleaned.append({
+            "question": text,
+            "options": options,
+            "answer_index": idx,
+            "explanation": (q.get("explanation") or "").strip(),
+            "page": page,
+        })
+    return cleaned
+
+
+def _generate_quiz(context_pages, context_label, num_questions):
+    if not GEMINI_API_KEY:
+        return None, (
+            "Chưa cấu hình GEMINI_API_KEY trên server nên mình chưa tạo được quiz. "
+            "Vui lòng thiết lập biến môi trường GEMINI_API_KEY rồi thử lại."
+        )
+
+    context_block = _format_context_block(context_pages, context_label)
+    instruction = QUIZ_INSTRUCTION.format(n=num_questions, k=QUIZ_NUM_OPTIONS)
+
+    model = genai.GenerativeModel(
+        model_name=GEMINI_MODEL_NAME,
+        system_instruction=SYSTEM_PROMPT,
+    )
+
+    user_turn = (
+        f"NGỮ CẢNH SLIDE (nội dung thật, trích từ file):\n{context_block}\n\n"
+        f"{instruction}"
+    )
+
+    try:
+        response = model.generate_content(
+            [{"role": "user", "parts": [user_turn]}],
+            generation_config={"response_mime_type": "application/json"},
+        )
+        raw = (response.text or "").strip()
+    except Exception as e:
+        log.exception("Lỗi khi gọi Gemini API để tạo quiz")
+        return None, f"Xin lỗi, mình gặp lỗi khi tạo quiz ({e}). Bạn thử lại sau ít phút nhé."
+
+    parsed = _extract_json(raw)
+    valid_pages = {p["page"] for p in context_pages}
+    questions = _validate_quiz(parsed, valid_pages)
+
+    if not questions:
+        log.warning("Quiz trả về không dùng được. Raw: %s", raw[:500])
+        return None, (
+            "Mình chưa tạo được bộ câu hỏi hợp lệ từ nội dung slide này. "
+            "Bạn thử lại, hoặc chọn phạm vi trang có nhiều nội dung chữ hơn nhé."
+        )
+
+    return questions[:num_questions], None
+
+
+@app.route("/api/quiz", methods=["POST"])
+def api_quiz():
+    body = request.get_json(force=True, silent=True) or {}
+    file_id = body.get("file_id")
+    page = body.get("page")
+    page_from = body.get("page_from")
+    page_to = body.get("page_to")
+
+    try:
+        num_questions = int(body.get("num_questions") or QUIZ_NUM_QUESTIONS)
+    except (TypeError, ValueError):
+        num_questions = QUIZ_NUM_QUESTIONS
+    num_questions = max(1, min(num_questions, 10))
+
+    if not file_id:
+        return jsonify({
+            "error": "Bạn hãy chọn một tài liệu trong thư viện trước khi tạo quiz nhé.",
+        }), 400
+
+    lib = build_library()
+    _, f = find_file(lib, file_id)
+    if not f:
+        return jsonify({
+            "error": "Mình không tìm thấy tài liệu này trong thư viện slide hiện có.",
+        }), 404
+
+    # Mặc định quiz lấy từ TOÀN BỘ tài liệu; nếu học viên đã chọn phạm vi trang thì tôn trọng.
+    context_pages, context_label = _gather_context(lib, file_id, page, page_from, page_to)
+
+    if not context_pages:
+        return jsonify({
+            "error": "Không có nội dung nào trong phạm vi trang đã chọn để tạo quiz.",
+        }), 400
+
+    if not any((p.get("text") or "").strip() for p in context_pages):
+        return jsonify({
+            "error": (
+                "Các trang trong phạm vi này không trích được text (có thể là ảnh scan), "
+                "nên mình chưa tạo được quiz."
+            ),
+        }), 400
+
+    questions, error = _generate_quiz(context_pages, context_label, num_questions)
+    if error:
+        return jsonify({"error": error}), 502
+
+    return jsonify({
+        "quiz": {"questions": questions},
+        "label": context_label,
+        "file_name": f["name"],
+    })
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5000"))
     app.run(host="0.0.0.0", port=port, debug=os.environ.get("FLASK_DEBUG") == "1")
