@@ -356,15 +356,16 @@ def _gather_context(lib, file_id, page, page_from, page_to, message=""):
     return pages, label
 
 
-def _format_context_block(pages, label) -> str:
+def _format_context_block(pages, label, max_chars=None) -> str:
     if not pages:
         return "(Không có nội dung slide nào được cấp cho câu hỏi này.)"
+    limit = max_chars or MAX_CONTEXT_CHARS
     parts = [f"# Tài liệu: {label}"]
     total_chars = 0
     for p in pages:
         chunk = f"\n## Trang {p['page']}\n{p['text'] or '(trang không có text trích xuất được)'}"
         total_chars += len(chunk)
-        if total_chars > MAX_CONTEXT_CHARS:
+        if total_chars > limit:
             parts.append("\n[...ngữ cảnh bị cắt bớt do quá dài...]")
             break
         parts.append(chunk)
@@ -416,7 +417,13 @@ def _call_gemini(message, context_pages, context_label, history):
 # --------------------------------------------------------------------------
 
 QUIZ_NUM_QUESTIONS = int(os.environ.get("VLEARN_QUIZ_QUESTIONS", "5"))
+QUIZ_MAX_QUESTIONS = int(os.environ.get("VLEARN_QUIZ_MAX_QUESTIONS", "30"))
 QUIZ_NUM_OPTIONS = 4
+# Quiz nhiều câu cần nhiều ngữ cảnh hơn chat thường, nếu không model sẽ hỏi
+# dồn vào mấy trang đầu (phần duy nhất lọt qua giới hạn cắt).
+QUIZ_MAX_CONTEXT_CHARS = int(
+    os.environ.get("VLEARN_QUIZ_MAX_CONTEXT_CHARS", str(MAX_CONTEXT_CHARS * 4))
+)
 
 QUIZ_INSTRUCTION = """
 Nhiệm vụ lần này: soạn một BỘ CÂU HỎI TRẮC NGHIỆM để kiểm tra xem học viên đã
@@ -428,6 +435,7 @@ Cách làm:
 3. Câu hỏi phải trải đều các phần khác nhau của tài liệu, không dồn hết vào một trang.
 
 Ràng buộc bắt buộc:
+- Phải trả về ĐỦ {n} câu hỏi, không được ít hơn.
 - CHỈ dùng thông tin có thật trong NGỮ CẢNH SLIDE. Không hỏi kiến thức ngoài slide.
 - Mỗi câu phải có ĐÚNG 1 đáp án đúng; 3 phương án còn lại phải sai rõ ràng nhưng
   hợp lý (không phải đáp án "bẫy" vô nghĩa như "không có đáp án nào đúng").
@@ -533,7 +541,9 @@ def _generate_quiz(context_pages, context_label, num_questions):
             "Vui lòng thiết lập biến môi trường GEMINI_API_KEY rồi thử lại."
         )
 
-    context_block = _format_context_block(context_pages, context_label)
+    context_block = _format_context_block(
+        context_pages, context_label, max_chars=QUIZ_MAX_CONTEXT_CHARS
+    )
     instruction = QUIZ_INSTRUCTION.format(n=num_questions, k=QUIZ_NUM_OPTIONS)
 
     model = genai.GenerativeModel(
@@ -582,7 +592,7 @@ def api_quiz():
         num_questions = int(body.get("num_questions") or QUIZ_NUM_QUESTIONS)
     except (TypeError, ValueError):
         num_questions = QUIZ_NUM_QUESTIONS
-    num_questions = max(1, min(num_questions, 10))
+    num_questions = max(1, min(num_questions, QUIZ_MAX_QUESTIONS))
 
     if not file_id:
         return jsonify({
@@ -619,6 +629,8 @@ def api_quiz():
         "quiz": {"questions": questions},
         "label": context_label,
         "file_name": f["name"],
+        "requested": num_questions,
+        "returned": len(questions),
     })
 
 
