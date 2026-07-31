@@ -2,7 +2,7 @@
 
 - **Họ và tên:** Ngô Nguyễn Khải Hưng  
 - **Mã học viên:** 23020382  
-- **Nhóm:** V1-E403 · Zone 3  
+- **Nhóm:** V1-E403 · Zone 4  
 - **Dự án:** VLearn AI Companion — Tính năng: *Tóm tắt slide khi trễ bài*  
 - **Vai trò trong nhóm:** Evidence Lead & Data Mining Engineer  
 
