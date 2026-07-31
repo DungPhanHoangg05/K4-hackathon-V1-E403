@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VLearn AI Companion</title>
+    <style>
+      :root {
+        --bg: #0a1120;
+        --bg-grad: radial-gradient(1200px 600px at 10% -10%, #14213f 0%, #0a1120 60%);
+        --panel: #101a30;
+        --panel-soft: #0c1526;
+        --panel-alt: #16213c;
+        --border: #1f2c48;
+        --border-soft: #182238;
+        --text: #eaf0fb;
+        --muted: #8a96b3;
+        --muted-dim: #63708c;
+        --primary: #3b82f6;
+        --primary-dim: #1d4ed8;
+        --primary-soft: #16233f;
+        --accent-teal: #22d3aa;
+        --accent-red: #ef4444;
+        --user-bubble: #2f6fed;
+        --assistant-bubble: #182238;
+        --radius-lg: 18px;
+        --radius-md: 14px;
+        --radius-sm: 10px;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body {
+        height: 100%;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Inter", "Segoe UI", Arial, sans-serif;
+        background: var(--bg-grad);
+        color: var(--text);
+      }
+
+      button, input {
+        font-family: inherit;
+        color: inherit;
+      }
+
+      .app {
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        padding: 18px 20px;
+        gap: 16px;
+      }
+
+      /* ---------- topbar ---------- */
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--panel);
+        border: 1px solid var(--border-soft);
+        padding: 12px 18px;
+        border-radius: var(--radius-lg);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      }
+
+      .topbar-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .icon-btn {
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+        border: 1px solid var(--border-soft);
+        background: var(--panel-alt);
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        font-size: 16px;
+        color: var(--text);
+        flex-shrink: 0;
+      }
+      .icon-btn:hover { border-color: var(--primary); }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 800;
+        font-size: 17px;
+        letter-spacing: 0.2px;
+      }
+
+      .brand-badge {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, var(--primary), #7c3aed);
+        display: grid;
+        place-items: center;
+        font-size: 15px;
+        color: white;
+      }
+
+      .doc-meta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding-left: 14px;
+        border-left: 1px solid var(--border-soft);
+        margin-left: 4px;
+      }
+
+      .doc-icon {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        background: var(--primary-soft);
+        color: var(--primary);
+        display: grid;
+        place-items: center;
+        font-size: 15px;
+      }
+
+      .doc-title { font-weight: 700; font-size: 14px; }
+      .doc-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+      .topbar-right { display: flex; align-items: center; gap: 10px; }
+      .pill-btn {
+        border: 1px solid var(--border-soft);
+        background: var(--panel-alt);
+        color: var(--text);
+        border-radius: 999px;
+        padding: 8px 14px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      /* ---------- workspace ---------- */
+      .workspace {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 300px 1fr 380px;
+        gap: 16px;
+        min-height: 0;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-lg);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      /* ---------- left: library ---------- */
+      .lib-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 18px;
+        border-bottom: 1px solid var(--border-soft);
+      }
+
+      .lib-header-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+        background: var(--primary-soft);
+        color: var(--primary);
+        display: grid;
+        place-items: center;
+        font-size: 16px;
+      }
+
+      .lib-title { font-weight: 800; font-size: 15px; }
+      .lib-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
+      .lib-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .day-group {
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-md);
+        background: var(--panel-soft);
+        overflow: hidden;
+      }
+
+      .day-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 14px;
+        cursor: pointer;
+      }
+
+      .day-head-left { display: flex; align-items: center; gap: 10px; }
+
+      .day-play {
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+        background: var(--primary-soft);
+        color: var(--primary);
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+      }
+
+      .day-name { font-weight: 700; font-size: 14px; }
+      .day-meta { font-size: 11px; color: var(--muted-dim); margin-top: 2px; }
+      .day-meta .pub { color: var(--accent-teal); }
+
+      .chevron { color: var(--muted); transition: transform 0.15s ease; font-size: 12px; }
+      .day-group.collapsed .chevron { transform: rotate(-90deg); }
+      .day-group.collapsed .day-files { display: none; }
+
+      .day-files {
+        padding: 0 10px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .file-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 10px;
+        border-radius: 10px;
+        cursor: pointer;
+        border: 1px solid transparent;
+      }
+      .file-item:hover { background: var(--panel-alt); }
+      .file-item.active {
+        background: var(--primary-soft);
+        border-color: var(--primary-dim);
+      }
+
+      .file-icon {
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+        background: var(--panel-alt);
+        color: var(--muted);
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+        flex-shrink: 0;
+      }
+      .file-item.active .file-icon { color: var(--primary); }
+
+      .file-name {
+        font-size: 12.5px;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .file-pages { font-size: 11px; color: var(--muted-dim); margin-top: 1px; }
+
+      /* ---------- middle: viewer ---------- */
+      .viewer-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border-soft);
+        flex-wrap: wrap;
+      }
+
+      .tool-btn {
+        border: 1px solid var(--border-soft);
+        background: var(--panel-alt);
+        border-radius: 10px;
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        font-size: 13px;
+      }
+      .tool-btn.active { background: var(--primary-soft); border-color: var(--primary-dim); color: var(--primary); }
+      .tool-btn:hover { border-color: var(--primary); }
+
+      .page-badge {
+        border: 1px solid var(--border-soft);
+        background: var(--panel-alt);
+        border-radius: 999px;
+        padding: 8px 14px;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .zoom-group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid var(--border-soft);
+        background: var(--panel-alt);
+        border-radius: 999px;
+        padding: 4px 10px;
+      }
+      .zoom-group button {
+        border: none;
+        background: transparent;
+        width: 22px;
+        height: 22px;
+        cursor: pointer;
+        color: var(--text);
+        font-size: 14px;
+      }
+      .zoom-label { font-size: 12px; font-weight: 700; min-width: 42px; text-align: center; }
+
+      .toolbar-spacer { flex: 1; }
+
+      .viewer-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 22px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 26px;
+        background:
+          repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.015) 40px);
+      }
+
+      .slide-wrap { width: 100%; max-width: 760px; }
+
+      .slide-tag {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: var(--muted-dim);
+        margin-bottom: 8px;
+        font-family: "SFMono-Regular", Consolas, monospace;
+      }
+
+      .slide-card {
+        border-radius: 16px;
+        aspect-ratio: 16 / 9;
+        padding: 34px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid var(--border-soft);
+      }
+
+      .slide-card.dark {
+        background: linear-gradient(135deg, #0d1730 0%, #1a2c5c 100%);
+        color: #f2f5ff;
+      }
+      .slide-card.light {
+        background: #f7f9fd;
+        color: #16233f;
+      }
+
+      .slide-eyebrow {
+        font-size: 11px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        font-weight: 700;
+        opacity: 0.65;
+        margin-bottom: 10px;
+      }
+
+      .slide-card h2 { margin: 0 0 10px; font-size: 26px; line-height: 1.25; }
+      .slide-card h2 em { color: var(--primary); font-style: normal; }
+      .slide-card p.desc { margin: 0; font-size: 13.5px; opacity: 0.8; max-width: 90%; line-height: 1.6; }
+
+      .story-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-top: 14px;
+      }
+      .story-cell {
+        border: 1px solid #e2e8f5;
+        border-radius: 10px;
+        padding: 10px;
+        background: white;
+      }
+      .story-cell .num { font-size: 10px; color: var(--primary); font-weight: 800; }
+      .story-cell .t { font-size: 12px; font-weight: 700; margin: 3px 0 4px; }
+      .story-cell .d { font-size: 10.5px; color: #64748b; line-height: 1.4; }
+
+      .bullet-list { margin: 6px 0 0; padding-left: 18px; font-size: 13.5px; line-height: 1.8; opacity: 0.85; }
+
+      .slide-footer-tag {
+        position: absolute;
+        bottom: 16px;
+        left: 34px;
+        right: 34px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 10.5px;
+        opacity: 0.5;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+      }
+
+      .viewer-pagination {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        padding: 12px;
+        border-top: 1px solid var(--border-soft);
+      }
+
+      .nav-round {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: 1px solid var(--border-soft);
+        background: var(--panel-alt);
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+      }
+      .nav-round:hover { border-color: var(--primary); }
+      .page-readout { font-size: 13px; font-weight: 700; color: var(--muted); }
+      .page-readout b { color: var(--text); }
+
+      /* ---------- right: tutor ---------- */
+      .tutor-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 16px 12px;
+        border-bottom: 1px solid var(--border-soft);
+        position: relative;
+      }
+
+      .tutor-title-block { display: flex; align-items: center; gap: 10px; }
+
+      .tutor-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, var(--primary), #7c3aed);
+        display: grid;
+        place-items: center;
+        font-size: 16px;
+      }
+
+      .tutor-name { font-weight: 800; font-size: 14.5px; }
+      .tutor-sub { font-size: 11px; color: var(--accent-teal); font-weight: 600; margin-top: 1px; }
+
+      .tutor-actions { display: flex; align-items: center; gap: 8px; }
+
+      .history-panel {
+        position: absolute;
+        top: 54px;
+        right: 60px;
+        width: 250px;
+        background: var(--panel-alt);
+        border: 1px solid var(--border-soft);
+        border-radius: 14px;
+        padding: 14px;
+        box-shadow: 0 14px 34px rgba(0,0,0,0.45);
+        z-index: 20;
+        display: none;
+      }
+      .history-panel.open { display: block; }
+      .history-panel .h-title { font-size: 12.5px; font-weight: 800; margin-bottom: 8px; }
+      .history-panel .h-empty { font-size: 12px; color: var(--muted); }
+      .history-item {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 8px 9px;
+        border-radius: 9px;
+        cursor: pointer;
+        margin-bottom: 4px;
+      }
+      .history-item:hover { background: var(--panel-soft); }
+      .history-item .h-item-title {
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .history-item .h-item-meta { font-size: 10.5px; color: var(--muted-dim); }
+
+      .slide-scope-pill {
+        margin: 0 16px 10px;
+        align-self: flex-start;
+        border: 1px solid var(--border-soft);
+        background: var(--panel-alt);
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--primary);
+        width: fit-content;
+      }
+
+      .messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 4px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .ctx-tag {
+        font-size: 10.5px;
+        color: var(--muted-dim);
+        font-family: "SFMono-Regular", Consolas, monospace;
+        margin: 10px 0 2px 2px;
+      }
+
+      .bubble {
+        max-width: 88%;
+        padding: 11px 13px;
+        border-radius: 14px;
+        line-height: 1.55;
+        font-size: 13.5px;
+        white-space: pre-line;
+      }
+
+      .bubble.assistant {
+        background: var(--assistant-bubble);
+        border: 1px solid var(--border-soft);
+        align-self: flex-start;
+        border-bottom-left-radius: 4px;
+      }
+      .bubble.user {
+        background: var(--user-bubble);
+        color: white;
+        align-self: flex-end;
+        border-bottom-right-radius: 4px;
+      }
+
+      .range-tool {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin: 12px 16px 0;
+        padding: 10px 10px;
+        border: 1px solid var(--border-soft);
+        background: var(--panel-soft);
+        border-radius: 12px;
+      }
+      .range-label {
+        font-size: 11.5px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .range-input {
+        width: 46px;
+        border: 1px solid var(--border-soft);
+        background: var(--panel-alt);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 6px 6px;
+        font-size: 12px;
+        text-align: center;
+        outline: none;
+      }
+      .range-input:focus { border-color: var(--primary); }
+      .range-go {
+        margin-left: auto;
+        border: none;
+        background: var(--primary);
+        color: white;
+        border-radius: 8px;
+        padding: 7px 12px;
+        font-size: 11.5px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .range-go:hover { background: var(--primary-dim); }
+
+      .quick-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 10px 16px 0;
+      }
+      .chip {
+        background: var(--panel-alt);
+        border: 1px solid var(--border-soft);
+        color: var(--text);
+        border-radius: 999px;
+        padding: 7px 11px;
+        font-size: 11.5px;
+        cursor: pointer;
+      }
+      .chip:hover { border-color: var(--primary); }
+
+      .input-row {
+        display: flex;
+        gap: 8px;
+        padding: 14px 16px;
+        border-top: 1px solid var(--border-soft);
+      }
+      .input-row input {
+        flex: 1;
+        border: 1px solid var(--border-soft);
+        background: var(--panel-soft);
+        border-radius: 12px;
+        padding: 11px 13px;
+        font-size: 13px;
+        color: var(--text);
+        outline: none;
+      }
+      .input-row input:focus { border-color: var(--primary); }
+      .send-btn {
+        border: none;
+        border-radius: 12px;
+        width: 42px;
+        background: var(--primary);
+        color: white;
+        cursor: pointer;
+        font-size: 15px;
+      }
+      .send-btn:hover { background: var(--primary-dim); }
+
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-thumb { background: #253253; border-radius: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+
+      @media (max-width: 1100px) {
+        .workspace { grid-template-columns: 1fr; }
+        .panel { min-height: 420px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <!-- TOP BAR -->
+      <div class="topbar">
+        <div class="topbar-left">
+          <div class="icon-btn">←</div>
+          <div class="brand">
+            <div class="brand-badge">✦</div>
+            VLearn
+          </div>
+          <div class="doc-meta">
+            <div class="doc-icon">📄</div>
+            <div>
+              <div class="doc-title" id="topDocTitle">day05-lecture-slides-batch03.pdf</div>
+              <div class="doc-sub" id="topDocSub">COMP2010 · Lecture_material_ms5r18w1_oe5xlz</div>
+            </div>
+          </div>
+        </div>
+        <div class="topbar-right">
+          <button class="pill-btn">VI</button>
+          <div class="icon-btn">☀</div>
+        </div>
+      </div>
+
+      <!-- WORKSPACE -->
+      <div class="workspace">
+        <!-- LEFT: LIBRARY -->
+        <div class="panel">
+          <div class="lib-header">
+            <div class="lib-header-icon">📚</div>
+            <div>
+              <div class="lib-title">Học liệu môn học</div>
+              <div class="lib-sub">Chương, slide và tài liệu đã upload</div>
+            </div>
+          </div>
+          <div class="lib-body" id="libBody"></div>
+        </div>
+
+        <!-- MIDDLE: VIEWER -->
+        <div class="panel">
+          <div class="viewer-toolbar">
+            <div class="tool-btn active" title="Chọn">▷</div>
+            <div class="page-badge" id="pageBadge">Trang 1 · 1 note</div>
+            <div class="zoom-group">
+              <button id="zoomOut">−</button>
+              <span class="zoom-label" id="zoomLabel">100%</span>
+              <button id="zoomIn">+</button>
+            </div>
+            <div class="toolbar-spacer"></div>
+            <div class="tool-btn" title="Tải xuống">⬇</div>
+            <div class="tool-btn" title="Sao chép">⧉</div>
+            <div class="tool-btn" title="Hoàn tác">↺</div>
+            <div class="tool-btn" title="Xoá">🗑</div>
+          </div>
+
+          <div class="viewer-body" id="viewerBody"></div>
+
+          <div class="viewer-pagination">
+            <div class="nav-round" id="prevPage">‹</div>
+            <div class="page-readout">Trang <b id="pageCurrent">1</b> / <span id="pageTotal">39</span></div>
+            <div class="nav-round" id="nextPage">›</div>
+          </div>
+        </div>
+
+        <!-- RIGHT: TUTOR -->
+        <div class="panel">
+          <div class="tutor-header">
+            <div class="tutor-title-block">
+              <div class="tutor-avatar">🤖</div>
+              <div>
+                <div class="tutor-name">VLearn Tutor</div>
+                <div class="tutor-sub">Trợ lý học theo ngữ cảnh</div>
+              </div>
+            </div>
+            <div class="tutor-actions">
+              <div class="icon-btn" id="historyBtn" title="Lịch sử trò chuyện">🕐</div>
+              <div class="icon-btn" id="newChatBtn" title="Cuộc trò chuyện mới">+</div>
+              <div class="pill-btn" id="slidePagePill">Trang slide: 1</div>
+            </div>
+
+            <div class="history-panel" id="historyPanel">
+              <div class="h-title">Lịch sử trò chuyện</div>
+              <div id="historyList"></div>
+            </div>
+          </div>
+
+          <div class="messages" id="messages">
+            <div class="ctx-tag">Ngữ cảnh: Slide trang <span id="ctxPage1">1</span></div>
+            <div class="bubble assistant">Xin chào! Bạn có thể chọn một đoạn trên slide để hỏi hoặc gửi câu hỏi tự do nhé!</div>
+          </div>
+
+          <div class="range-tool">
+            <span class="range-label">Tóm tắt từ trang</span>
+            <input type="number" id="rangeFrom" class="range-input" min="1" value="1" />
+            <span class="range-label">đến trang</span>
+            <input type="number" id="rangeTo" class="range-input" min="1" value="1" />
+            <button class="range-go" id="rangeGoBtn">Tóm tắt</button>
+          </div>
+
+          <div class="quick-actions">
+            <button class="chip" onclick="sendQuick('Tóm tắt slide này')">Tóm tắt slide này</button>
+            <button class="chip" onclick="sendQuick('Giải thích ngắn gọn')">Giải thích ngắn gọn</button>
+            <button class="chip" onclick="sendQuick('Tóm tắt buổi hôm nay')">Tóm tắt buổi hôm nay</button>
+          </div>
+
+          <div class="input-row">
+            <input id="input" placeholder="Nhập câu hỏi hoặc bôi đen tài liệu..." />
+            <button class="send-btn" onclick="sendMessage()">➤</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ---------------- FAKE DATA ----------------
+      const library = [
+        {
+          id: "day01",
+          name: "Day01",
+          count: "2 tài liệu",
+          published: true,
+          files: [
+            {
+              id: "day01_302",
+              name: "day01_302.pdf",
+              pages: 83,
+              slides: [
+                { type: "dark", eyebrow: "AI IN ACTION · DAY 01", tag: "DAY 01",
+                  title: "Nhập môn <em>AI Product Thinking</em>",
+                  desc: "Làm quen với tư duy sản phẩm AI: vấn đề thật, người dùng thật, dữ liệu thật." },
+                { type: "light", eyebrow: "KHÁI NIỆM", tag: "01/83",
+                  title: "3 trụ cột của một sản phẩm AI tốt",
+                  bullets: ["Vấn đề rõ ràng, có người trả tiền để giải quyết", "Dữ liệu đủ tốt để mô hình học được điều gì đó thật", "Vòng phản hồi để sản phẩm tốt lên theo thời gian"] }
+              ]
+            },
+            {
+              id: "material_mrxpq9zu",
+              name: "material_mrxpq9zu_t8e6xs...",
+              pages: 32,
+              slides: [
+                { type: "dark", eyebrow: "TÀI LIỆU THAM KHẢO", tag: "DAY 01",
+                  title: "Case study: Từ demo đến production",
+                  desc: "Tổng hợp các case thực tế về việc đưa AI demo ra sản phẩm thật." }
+              ]
+            }
+          ]
+        },
+        {
+          id: "day02",
+          name: "Day02",
+          count: "1 tài liệu",
+          published: true,
+          files: [
+            {
+              id: "material_95eb786b4d9e",
+              name: "material_95eb786b4d9e.pdf",
+              pages: 76,
+              slides: [
+                { type: "dark", eyebrow: "AI IN ACTION · DAY 02", tag: "DAY 02",
+                  title: "Thu thập và làm sạch <em>dữ liệu thật</em>",
+                  desc: "Dữ liệu bẩn giết chết sản phẩm AI nhanh hơn bất kỳ điều gì khác." },
+                { type: "light", eyebrow: "QUY TRÌNH", tag: "02/76",
+                  title: "4 bước làm sạch dữ liệu tối thiểu",
+                  bullets: ["Loại bỏ trùng lặp và giá trị rỗng", "Chuẩn hoá định dạng và đơn vị", "Gắn nhãn một tập nhỏ để kiểm tra chất lượng", "Ghi lại nguồn gốc dữ liệu để truy vết sau này"] }
+              ]
+            }
+          ]
+        },
+        {
+          id: "day03",
+          name: "Day03",
+          count: "2 tài liệu",
+          published: true,
+          files: [
+            {
+              id: "day03-tu-chatbot-den-agent",
+              name: "day03-tu-chatbot-den-age...",
+              pages: 46,
+              slides: [
+                { type: "dark", eyebrow: "AI IN ACTION · DAY 03", tag: "DAY 03",
+                  title: "Từ chatbot đến <em>agent tự hành</em>",
+                  desc: "Sự khác biệt giữa một chatbot trả lời và một agent thực sự hành động." },
+                { type: "light", eyebrow: "SO SÁNH", tag: "02/46",
+                  title: "Chatbot vs Agent",
+                  bullets: ["Chatbot: trả lời câu hỏi trong một lượt hội thoại", "Agent: tự lập kế hoạch, gọi công cụ, thực hiện nhiều bước", "Agent cần cơ chế kiểm soát rủi ro chặt chẽ hơn"] }
+              ]
+            },
+            {
+              id: "day03_extra",
+              name: "day03_bai-tap-thuc-hanh.pdf",
+              pages: 18,
+              slides: [
+                { type: "dark", eyebrow: "BÀI TẬP", tag: "DAY 03",
+                  title: "Thực hành: Thiết kế một agent nhỏ",
+                  desc: "Áp dụng lý thuyết vào một bài tập agent xử lý yêu cầu đặt lịch." }
+              ]
+            }
+          ]
+        },
+        {
+          id: "day04",
+          name: "Day04",
+          count: "1 tài liệu",
+          published: true,
+          files: [
+            {
+              id: "day04_eval",
+              name: "day04-danh-gia-mo-hinh.pdf",
+              pages: 54,
+              slides: [
+                { type: "dark", eyebrow: "AI IN ACTION · DAY 04", tag: "DAY 04",
+                  title: "Đánh giá chất lượng mô hình",
+                  desc: "Không có số đo, không có cải tiến — xây dựng bộ eval cho sản phẩm AI." },
+                { type: "light", eyebrow: "CHỈ SỐ", tag: "02/54",
+                  title: "Những chỉ số nên theo dõi mỗi tuần",
+                  bullets: ["Tỷ lệ phản hồi hữu ích theo người dùng thật", "Tỷ lệ lỗi nghiêm trọng cần con người can thiệp", "Độ trễ trung bình và chi phí mỗi truy vấn"] }
+              ]
+            }
+          ]
+        },
+        {
+          id: "day05",
+          name: "Day05",
+          count: "1 tài liệu",
+          published: true,
+          files: [
+            {
+              id: "day05-lecture-slides-batch03",
+              name: "day05-lecture-slides-batch03.pdf",
+              pages: 39,
+              slides: [
+                { type: "dark", eyebrow: "AI IN ACTION · DAY 05 · BATCH 02", tag: "DAY 05",
+                  title: "Thiết kế sản phẩm AI <em>cho sự không chắc chắn</em>",
+                  desc: "Tìm vấn đề thật, thiết kế cho lúc AI sai, và cắt vừa đủ scope để ý tưởng AI có thể chứng minh được giá trị thật." },
+                { type: "light", eyebrow: "STORY MAP", tag: "02/39",
+                  title: "Câu chuyện hôm nay: từ demo chạy được đến product đáng tin",
+                  story: [
+                    { num: "01", t: "Demo chạy", d: "AI có thể chạy được trong demo, nhưng chưa chắc dùng được." },
+                    { num: "02", t: "User thật", d: "Người dùng thật hành xử khác hoàn toàn so với kịch bản." },
+                    { num: "03", t: "Lỗi thật", d: "AI sẽ sai ở đâu đó, câu hỏi là hệ thống có ứng phó được không." },
+                    { num: "04", t: "Decision", d: "Giữ nguyên scope hay cắt bớt để đảm bảo chất lượng." },
+                    { num: "05", t: "Build slice", d: "Xây một lát cắt mỏng nhưng đủ thật để kiểm chứng." },
+                    { num: "06", t: "Demo evidence", d: "Chứng minh giá trị bằng bằng chứng, không chỉ bằng demo." }
+                  ] },
+                { type: "light", eyebrow: "NGUYÊN TẮC", tag: "03/39",
+                  title: "Xác định vấn đề thật trước khi viết prompt",
+                  bullets: ["Xác định mục tiêu rõ ràng trước khi viết prompt", "Cung cấp ngữ cảnh và ví dụ cụ thể cho mô hình", "Chia nhỏ nhiệm vụ để tránh prompt quá dài và mơ hồ"] },
+                { type: "light", eyebrow: "THỰC HÀNH", tag: "04/39",
+                  title: "Cắt scope tối thiểu để kiểm chứng ý tưởng",
+                  bullets: ["Bắt đầu từ một yêu cầu cụ thể, không lan man", "Cho AI biết phần nào cần ưu tiên xử lý trước", "Luôn yêu cầu một bản tóm tắt ngắn gọn để kiểm tra lại"] }
+              ]
+            }
+          ]
+        }
+      ];
+
+      // ---------------- STATE ----------------
+      let currentFileId = "day05-lecture-slides-batch03";
+      let currentPage = 1;
+      let zoom = 100;
+
+      function findFile(fileId) {
+        for (const day of library) {
+          const f = day.files.find(x => x.id === fileId);
+          if (f) return { day, file: f };
+        }
+        return null;
+      }
+
+      // ---------------- RENDER: LEFT LIBRARY ----------------
+      const libBody = document.getElementById("libBody");
+
+      function renderLibrary() {
+        libBody.innerHTML = "";
+        library.forEach(day => {
+          const group = document.createElement("div");
+          group.className = "day-group";
+          group.dataset.dayId = day.id;
+
+          const head = document.createElement("div");
+          head.className = "day-head";
+          head.innerHTML = `
+            <div class="day-head-left">
+              <div class="day-play">▶</div>
+              <div>
+                <div class="day-name">${day.name}</div>
+                <div class="day-meta">${day.count} · <span class="pub">${day.published ? "PUBLISHED" : "DRAFT"}</span></div>
+              </div>
+            </div>
+            <div class="chevron">▾</div>
+          `;
+          head.addEventListener("click", () => {
+            group.classList.toggle("collapsed");
+          });
+
+          const filesWrap = document.createElement("div");
+          filesWrap.className = "day-files";
+
+          day.files.forEach(file => {
+            const item = document.createElement("div");
+            item.className = "file-item" + (file.id === currentFileId ? " active" : "");
+            item.dataset.fileId = file.id;
+            item.innerHTML = `
+              <div class="file-icon">▶</div>
+              <div>
+                <div class="file-name">${file.name}</div>
+                <div class="file-pages">${file.pages} trang</div>
+              </div>
+            `;
+            item.addEventListener("click", (e) => {
+              e.stopPropagation();
+              selectFile(file.id);
+            });
+            filesWrap.appendChild(item);
+          });
+
+          group.appendChild(head);
+          group.appendChild(filesWrap);
+          libBody.appendChild(group);
+        });
+      }
+
+      function selectFile(fileId) {
+        currentFileId = fileId;
+        currentPage = 1;
+        document.querySelectorAll(".file-item").forEach(el => {
+          el.classList.toggle("active", el.dataset.fileId === fileId);
+        });
+        const found = findFile(fileId);
+        if (found) {
+          document.getElementById("topDocTitle").textContent = found.file.name;
+          document.getElementById("topDocSub").textContent = `COMP2010 · ${found.day.name}`;
+          setRangeBounds(found.file.slides.length);
+        }
+        renderViewer();
+      }
+
+      // ---------------- RENDER: MIDDLE VIEWER ----------------
+      const viewerBody = document.getElementById("viewerBody");
+
+      function slideCardHTML(slide, pageNum, totalPages) {
+        let inner = "";
+        if (slide.story) {
+          inner = `
+            <div class="slide-eyebrow">${slide.eyebrow}</div>
+            <h2>${slide.title}</h2>
+            <div class="story-grid">
+              ${slide.story.map(s => `
+                <div class="story-cell">
+                  <div class="num">${s.num}</div>
+                  <div class="t">${s.t}</div>
+                  <div class="d">${s.d}</div>
+                </div>
+              `).join("")}
+            </div>
+          `;
+        } else if (slide.bullets) {
+          inner = `
+            <div class="slide-eyebrow">${slide.eyebrow}</div>
+            <h2>${slide.title}</h2>
+            <ul class="bullet-list">${slide.bullets.map(b => `<li>${b}</li>`).join("")}</ul>
+          `;
+        } else {
+          inner = `
+            <div class="slide-eyebrow">${slide.eyebrow}</div>
+            <h2>${slide.title}</h2>
+            <p class="desc">${slide.desc}</p>
+          `;
+        }
+        return `
+          <div class="slide-card ${slide.type}">
+            ${inner}
+            <div class="slide-footer-tag">
+              <span>${slide.tag}</span>
+              <span>${pageNum}/${totalPages}</span>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderViewer() {
+        const found = findFile(currentFileId);
+        if (!found) return;
+        const { file } = found;
+        viewerBody.innerHTML = "";
+
+        file.slides.forEach((slide, idx) => {
+          const pageNum = idx + 1;
+          const wrap = document.createElement("div");
+          wrap.className = "slide-wrap";
+          wrap.dataset.page = pageNum;
+          wrap.innerHTML = `
+            <div class="slide-tag"><span>Trang ${pageNum} / ${file.pages}</span><span>${file.name}</span></div>
+            ${slideCardHTML(slide, pageNum, file.pages)}
+          `;
+          viewerBody.appendChild(wrap);
+        });
+
+        document.getElementById("pageTotal").textContent = file.pages;
+        updatePageIndicators(1);
+      }
+
+      function updatePageIndicators(page) {
+        currentPage = page;
+        document.getElementById("pageBadge").textContent = `Trang ${page} · 1 note`;
+        document.getElementById("pageCurrent").textContent = page;
+        document.getElementById("slidePagePill").textContent = `Trang slide: ${page}`;
+        document.getElementById("ctxPage1").textContent = page;
+      }
+
+      document.getElementById("prevPage").addEventListener("click", () => {
+        const found = findFile(currentFileId);
+        if (!found) return;
+        const max = found.file.slides.length;
+        const next = Math.max(1, currentPage - 1);
+        updatePageIndicators(next);
+        scrollToPage(next);
+      });
+      document.getElementById("nextPage").addEventListener("click", () => {
+        const found = findFile(currentFileId);
+        if (!found) return;
+        const max = found.file.slides.length;
+        const next = Math.min(max, currentPage + 1);
+        updatePageIndicators(next);
+        scrollToPage(next);
+      });
+
+      function scrollToPage(page) {
+        const target = viewerBody.querySelector(`.slide-wrap[data-page="${page}"]`);
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      document.getElementById("zoomIn").addEventListener("click", () => {
+        zoom = Math.min(160, zoom + 10);
+        applyZoom();
+      });
+      document.getElementById("zoomOut").addEventListener("click", () => {
+        zoom = Math.max(60, zoom - 10);
+        applyZoom();
+      });
+      function applyZoom() {
+        document.getElementById("zoomLabel").textContent = `${zoom}%`;
+        viewerBody.style.setProperty("--zoom", zoom / 100);
+        document.querySelectorAll(".slide-wrap").forEach(el => {
+          el.style.transform = `scale(${zoom / 100})`;
+          el.style.transformOrigin = "top center";
+        });
+      }
+
+      // update indicators when scrolling manually
+      viewerBody.addEventListener("scroll", () => {
+        const wraps = [...viewerBody.querySelectorAll(".slide-wrap")];
+        const viewerTop = viewerBody.getBoundingClientRect().top;
+        let closest = wraps[0];
+        let closestDist = Infinity;
+        wraps.forEach(w => {
+          const dist = Math.abs(w.getBoundingClientRect().top - viewerTop);
+          if (dist < closestDist) { closestDist = dist; closest = w; }
+        });
+        if (closest) {
+          const page = parseInt(closest.dataset.page, 10);
+          if (page !== currentPage) updatePageIndicators(page);
+        }
+      });
+
+      // ---------------- PAGE-RANGE SUMMARIZE ----------------
+      const rangeFrom = document.getElementById("rangeFrom");
+      const rangeTo = document.getElementById("rangeTo");
+      const rangeGoBtn = document.getElementById("rangeGoBtn");
+
+      function setRangeBounds(totalSlides) {
+        rangeFrom.min = 1;
+        rangeTo.min = 1;
+        rangeFrom.max = totalSlides;
+        rangeTo.max = totalSlides;
+        rangeFrom.value = 1;
+        rangeTo.value = totalSlides;
+      }
+
+      function summarizeRange(from, to) {
+        const found = findFile(currentFileId);
+        if (!found) return;
+        const total = found.file.slides.length;
+        from = Math.max(1, Math.min(from, total));
+        to = Math.max(1, Math.min(to, total));
+        if (from > to) [from, to] = [to, from];
+
+        const lines = [];
+        for (let p = from; p <= to; p++) {
+          const slide = found.file.slides[p - 1];
+          if (!slide) continue;
+          let point;
+          if (slide.bullets) point = slide.bullets[0];
+          else if (slide.story) point = slide.story.map(s => s.t).join(" → ");
+          else point = slide.desc;
+          lines.push(`• Trang ${p} — ${slide.title.replace(/<[^>]+>/g, "")}: ${point}`);
+        }
+
+        const rangeLabel = from === to ? `trang ${from}` : `trang ${from}–${to}`;
+        const summary = `Tóm tắt ${rangeLabel} (${found.file.name}):\n${lines.join("\n")}`;
+        appendMessage(`Tóm tắt từ trang ${from} đến trang ${to}`, true, false);
+        setTimeout(() => appendMessage(summary, false, true), 400);
+      }
+
+      rangeGoBtn.addEventListener("click", () => {
+        const from = parseInt(rangeFrom.value, 10) || 1;
+        const to = parseInt(rangeTo.value, 10) || from;
+        summarizeRange(from, to);
+      });
+
+      // ---------------- RIGHT: TUTOR CHAT ----------------
+      const historyBtn = document.getElementById("historyBtn");
+      const historyPanel = document.getElementById("historyPanel");
+      const historyList = document.getElementById("historyList");
+      const newChatBtn = document.getElementById("newChatBtn");
+      const messages = document.getElementById("messages");
+      const input = document.getElementById("input");
+
+      let chatSessions = []; // { id, title, fileId, page, html }
+      let sessionCounter = 0;
+
+      historyBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        renderHistoryList();
+        historyPanel.classList.toggle("open");
+      });
+      document.addEventListener("click", (e) => {
+        if (!historyPanel.contains(e.target) && e.target !== historyBtn) {
+          historyPanel.classList.remove("open");
+        }
+      });
+
+      function defaultGreetingHTML() {
+        return `
+          <div class="ctx-tag">Ngữ cảnh: Slide trang ${currentPage}</div>
+          <div class="bubble assistant">Xin chào! Bạn có thể chọn một đoạn trên slide để hỏi hoặc gửi câu hỏi tự do nhé!</div>
+        `;
+      }
+
+      function currentUserMessageCount() {
+        return messages.querySelectorAll(".bubble.user").length;
+      }
+
+      function saveCurrentSessionIfNeeded() {
+        if (currentUserMessageCount() === 0) return; // nothing worth saving yet
+        const firstUserBubble = messages.querySelector(".bubble.user");
+        const found = findFile(currentFileId);
+        chatSessions.unshift({
+          id: ++sessionCounter,
+          title: firstUserBubble ? firstUserBubble.textContent : "Cuộc trò chuyện",
+          fileName: found ? found.file.name : "",
+          page: currentPage,
+          html: messages.innerHTML
+        });
+      }
+
+      function startNewChat() {
+        saveCurrentSessionIfNeeded();
+        messages.innerHTML = defaultGreetingHTML();
+        historyPanel.classList.remove("open");
+        input.value = "";
+        input.focus();
+      }
+      newChatBtn.addEventListener("click", startNewChat);
+
+      function renderHistoryList() {
+        if (chatSessions.length === 0) {
+          historyList.innerHTML = `<div class="h-empty">Chưa có cuộc trò chuyện đã lưu.</div>`;
+          return;
+        }
+        historyList.innerHTML = "";
+        chatSessions.forEach(session => {
+          const item = document.createElement("div");
+          item.className = "history-item";
+          item.innerHTML = `
+            <div class="h-item-title">${session.title}</div>
+            <div class="h-item-meta">${session.fileName} · Trang ${session.page}</div>
+          `;
+          item.addEventListener("click", () => {
+            saveCurrentSessionIfNeeded();
+            chatSessions = chatSessions.filter(s => s.id !== session.id);
+            messages.innerHTML = session.html;
+            messages.scrollTop = messages.scrollHeight;
+            historyPanel.classList.remove("open");
+          });
+          historyList.appendChild(item);
+        });
+      }
+
+      function appendMessage(text, isUser, withCtx) {
+        if (withCtx) {
+          const ctx = document.createElement("div");
+          ctx.className = "ctx-tag";
+          ctx.textContent = `Ngữ cảnh: Slide trang ${currentPage}`;
+          messages.appendChild(ctx);
+        }
+        const bubble = document.createElement("div");
+        bubble.className = `bubble ${isUser ? "user" : "assistant"}`;
+        bubble.textContent = text;
+        messages.appendChild(bubble);
+        messages.scrollTop = messages.scrollHeight;
+      }
+
+      function sendQuick(text) {
+        input.value = text;
+        sendMessage();
+      }
+
+      function sendMessage() {
+        const text = input.value.trim();
+        if (!text) return;
+        appendMessage(text, true, true);
+        input.value = "";
+
+        setTimeout(() => {
+          const found = findFile(currentFileId);
+          const slide = found ? found.file.slides[currentPage - 1] : null;
+          const lower = text.toLowerCase();
+
+          if (lower.includes("tóm tắt") && lower.includes("buổi")) {
+            appendMessage("Bạn muốn tóm tắt từ trang nào đến trang nào? Dùng ô chọn phạm vi trang phía trên khung nhập để mình tóm tắt chính xác hơn nhé.", false, false);
+          } else if (lower.includes("tóm tắt")) {
+            let summary = `Tóm tắt nhanh trang ${currentPage}:\n`;
+            if (slide && slide.bullets) {
+              summary += slide.bullets.map(b => "• " + b).join("\n");
+            } else if (slide && slide.story) {
+              summary += slide.story.map(s => "• " + s.t + " — " + s.d).join("\n");
+            } else if (slide) {
+              summary += "• " + slide.desc;
+            }
+            summary += `\n\nNguồn: Trang ${currentPage} · ${found ? found.file.name : ""}`;
+            appendMessage(summary, false, false);
+          } else if (lower.includes("giải thích")) {
+            appendMessage("Đây là một nội dung ngắn gọn: hãy bắt đầu từ vấn đề thật, sau đó cắt scope tối thiểu để chứng minh giá trị trước khi mở rộng.", false, false);
+          } else {
+            appendMessage("Mình có thể hỗ trợ bạn tóm tắt nhanh, giải thích ngắn gọn hoặc kiểm tra phạm vi câu hỏi trên slide hiện tại.", false, false);
+          }
+        }, 500);
+      }
+
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") sendMessage();
+      });
+
+      // ---------------- INIT ----------------
+      renderLibrary();
+      renderViewer();
+      setRangeBounds(findFile(currentFileId).file.slides.length);
+    </script>
+  </body>
+</html>
