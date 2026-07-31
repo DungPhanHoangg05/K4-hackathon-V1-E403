@@ -1,0 +1,87 @@
+=== Quy mô dữ liệu ===
+rows: 2522
+turns (đủ cặp student+tutor): 1261 / 1261
+
+=== Mức nền toàn bộ (n = 1261 turn) ===
+citations = []           :  582  (46.2%)
+tutor trả lời not-found  :  153  (12.1%)
+tutor từ chối truy cập   :   37  (2.9%)
+not-found HOẶC từ chối   :  190  (15.1%)
+rating = down            :   37  (2.9%)
+
+=== Ý định tóm tắt (student hỏi) ===
+chứa "tóm tắt"                    :  128  (10.2% tổng số turn)
+mở rộng (tổng kết/ý chính/summar) :  142  (11.3%)
+
+=== Tutor phục vụ ý định này ra sao (n = 128) ===
+citations = []           :   83  (64.8%)   [nền 46.2%]
+trả lời not-found        :   30  (23.4%)   [nền 12.1%]
+từ chối truy cập tài liệu:   12  (9.4%)   [nền 2.9%]
+not-found HOẶC từ chối   :   42  (32.8%)   [nền 15.1%]
+rating = down            :    7  (5.5%)   [nền 2.9%]
+rating = up              :    3  (2.3%)
+
+=== Phạm vi học viên nêu trong câu hỏi tóm tắt ===
+phạm vi rõ (trang/slide N/đoạn chọn)  :  127  → thất bại  41 (32.3%)
+phạm vi mơ hồ (buổi/hôm nay/toàn bộ)  :    0  → thất bại   0 (n/a)
+không nêu phạm vi                     :    1  → thất bại   1 (100.0%)
+có nhắc slide/pdf/tài liệu            :   81  → thất bại  30 (37.0%)
+
+=== Phân bố lượt hỏi tóm tắt ===
+số học viên khác nhau  : 92
+số hội thoại khác nhau : 109
+top day_code: [('New learning material', 40), ('Lecture_material_ms203vsq_ob7vqp', 21), ('Lecture_material_ms2044ey_k6uor3', 12), ('Lecture_material_ms2039d0_hnxpxy', 10), ('Lecture_material_ms204i6x_gqwyya', 8)]
+
+=== Ví dụ: hỏi tóm tắt → tutor không phục vụ được ===
+
+[T0135] rating=down citations=[] move=review_concept
+  HV : (Trang 16, đoạn được chọn: "tóm tắt nội dung các giai đoạn được mô tả trên slide các biểu đồ") tóm tắt nội dung các giai đoạn được mô tả trên slide các biểu đồ
+  AI : Rất xin lỗi, hiện tại tôi không tìm thấy nội dung nào liên quan đến các "giai đoạn" hoặc "biểu đồ" trong tài liệu giảng dạy của ngày học này. Bạn có thể kiểm tra lại xem nội dung này nằm ở bài học nào
+
+[T0776] rating=down citations=[] move=review_concept
+  HV : (Trang 27, đoạn được chọn: "giải thích và tóm tắt nội dung học hôm này") giải thích và tóm tắt nội dung học hôm này
+  AI : Xin lỗi bạn, tôi không tìm thấy phần tóm tắt tổng quát trong nội dung bài giảng của ngày hôm nay. Bạn có thể cho tôi biết cụ thể chủ đề hoặc khái niệm mà bạn muốn tôi giải thích không? Tôi sẽ dựa vào 
+
+[T0938] rating=down citations=[] move=review_concept
+  HV : (Trang 42, đoạn được chọn: "tóm tắt tất cả nội dung cần note lại đầy đủ") tóm tắt tất cả nội dung cần note lại đầy đủ
+  AI : Rất tiếc, hiện tại tôi không thể truy cập nội dung cụ thể từ slide của ngày hôm nay để tóm tắt cho bạn. Nếu bạn có câu hỏi cụ thể về một khái niệm hoặc phần nội dung nào đó, hãy chia sẻ, tôi sẽ sẵn lò
+
+[T0042] rating=- citations=[] move=review_concept
+  HV : (Trang 17, đoạn được chọn: "Tóm tắt nội dung các ý chính trong slide này cho tôi") Tóm tắt nội dung các ý chính trong slide này cho tôi
+  AI : Rất tiếc, hiện tại tôi không thể truy cập nội dung cụ thể của trang 17 trong slide bài giảng để tóm tắt cho bạn. Có thể nội dung này nằm ngoài phạm vi tài liệu đã được tải lên hoặc trang này không chứ
+
+[T0079] rating=- citations=[] move=review_concept
+  HV : (Trang 1, đoạn được chọn: "Tóm tắt nội dung slide đầu tiên của Day 1 giúp mình.") Tóm tắt nội dung slide đầu tiên của Day 1 giúp mình.
+  AI : Rất xin lỗi bạn, mình đã kiểm tra lại toàn bộ nội dung slide của ngày hôm nay nhưng không tìm thấy thông tin giải thích về "React". Có vẻ như nội dung này không nằm trong phạm vi bài giảng Day 1 của c
+
+[T0122] rating=- citations=[] move=give_direct_answer
+  HV : (Trang 5, đoạn được chọn: "tóm tắt hết slice trong vài câu đi") tóm tắt hết slice trong vài câu đi
+  AI : Rất tiếc là mình đã thử tìm kiếm nội dung tổng quan từ các slide (với các từ khóa như "giới thiệu", "mục tiêu", "tóm tắt") nhưng hệ thống chưa trả về kết quả cụ thể để mình có thể khái quát lại toàn b
+
+[T0208] rating=- citations=[] move=review_concept
+  HV : (Trang 4, đoạn được chọn: "Trang 5 / 76") Tóm tắt nội dung slide
+  AI : Rất tiếc, hiện tại tôi không thể truy cập được nội dung cụ thể của trang 4 trong tài liệu bài giảng này. Bạn có thể cung cấp thêm thông tin hoặc tiêu đề chủ đề của ngày học không? Tôi sẽ hỗ trợ bạn tì
+
+[T0224] rating=- citations=[] move=review_concept
+  HV : (Trang 1, đoạn được chọn: "Tom tat ngan gon noi dung chinh cua bai hoc nay") Tom tat ngan gon noi dung chinh cua bai hoc nay
+  AI : Rất tiếc, mình đã tìm kiếm trong các slide bài giảng của ngày hôm nay nhưng không thấy nội dung tóm tắt hoặc danh mục các nội dung chính của bài học. Bạn có thể cho mình biết cụ thể chủ đề bạn đang mu
+
+=== Ví dụ đối chứng: hỏi tóm tắt CÓ trích dẫn trang ===
+
+[T1201] rating=- citations=[3, 96] move=review_concept
+  HV : (Trang 1, đoạn được chọn: "tóm tắt") tóm tắt
+  AI : Tool calling trong Prompt Engineering là kỹ thuật cho phép mô hình ngôn ngữ lớn (LLM) tương tác với các công cụ bên ngoài (ví dụ: truy vấn cơ sở dữ liệu, gọi API thời tiết, hoặc thực thi các hàm tính 
+
+[T0268] rating=- citations=[22] move=review_concept
+  HV : (Trang 22, đoạn được chọn: "Memory injection ■ Chỉ đưa vào facts thật sự cần cho task hiện tại ■ Ưu tiên recent history hoặc relevant history, không dump toàn bộ transcript ■ Tốt cho support agent, co
+  AI : Đoạn bôi đen này giới thiệu hai kỹ thuật quan trọng để tối ưu hóa context window (ngữ cảnh) khi làm việc với các mô hình ngôn ngữ lớn: 1. **Memory Injection (Cấp dữ liệu bộ nhớ):** Đây là cách chọn lọ
+
+[T0699] rating=- citations=[6] move=review_concept
+  HV : (Trang 49, đoạn được chọn: "tóm tắt toàn bộ slide sau đó đưa ra các ý chính") tóm tắt toàn bộ slide sau đó đưa ra các ý chính
+  AI : Dựa trên nội dung các slide đã tra cứu, bài học ngày hôm nay tập trung vào việc giới thiệu tổng quan về hệ sinh thái Trí tuệ Nhân tạo (AI) và các khái niệm cốt lõi đang dẫn dắt công nghệ hiện nay. Dướ
+
+=== Kiểm chứng turn được nêu đích danh ===
+
+[T0519] rating=down citations=[] move=review_concept
+  HV : (Trang 46, đoạn được chọn: "Tóm tắt slide pdf day2 cho tôi") Tóm tắt slide pdf day2 cho tôi
+  AI : Rất tiếc, tôi không thể truy cập trực tiếp vào tệp PDF của buổi học để tóm tắt cho bạn. Nếu bạn có các câu hỏi cụ thể về nội dung, khái niệm hay các thuật ngữ cần giải thích trong bài, hãy đặt câu hỏi và tôi sẽ hỗ trợ bạn tra cứu từ tài liệu được cung cấp.
