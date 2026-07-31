@@ -187,17 +187,54 @@ def _looks_like_test_answer_request(text: str) -> bool:
     return any(re.search(p, low) for p in TEST_ANSWER_PATTERNS)
 
 
-def _is_scope_ambiguous(text: str, file_id: str, page: int, page_from: int, page_to: int) -> bool:
-    low = text.lower()
-    wants_broad_summary = any(k in low for k in BROAD_SUMMARY_KEYWORDS)
-    has_summary_intent = any(k in low for k in SUMMARY_KEYWORDS)
-    if has_summary_intent and wants_broad_summary and not file_id:
-        return True
-    if has_summary_intent and not file_id:
-        return True
-    if has_summary_intent and page_from is None and page_to is None and not page:
-        return True
-    return False
+# Bắt phạm vi trang viết thẳng trong câu hỏi, ví dụ:
+#   "tóm tắt từ trang 3 đến trang 7", "tóm tắt trang 3-7", "slide 3 tới 7", "page 3 to 7"
+PAGE_RANGE_PATTERNS = [
+    r"(?:từ\s*)?(?:trang|slide|page|tr\.?)\s*(\d+)\s*(?:-|–|—|đến|den|tới|toi|->|to)\s*(?:trang|slide|page|tr\.?)?\s*(\d+)",
+    r"\b(\d+)\s*(?:-|–|—)\s*(\d+)\b",
+]
+# Một trang đơn: "tóm tắt trang 5", "giải thích slide 12"
+PAGE_SINGLE_PATTERN = r"(?:trang|slide|page|tr\.?)\s*(\d+)"
+# "tóm tắt toàn bộ / cả file / tất cả các trang"
+WHOLE_DOC_KEYWORDS = ["toàn bộ", "toan bo", "cả bài", "ca bai", "cả file", "ca file",
+                      "tất cả", "tat ca", "whole", "entire", "all pages", "cả tài liệu"]
+
+
+def _parse_page_scope(text: str):
+    """
+    Đọc phạm vi trang ngay trong câu hỏi của học viên.
+
+    Trả về (page_from, page_to, wants_whole_doc). Các giá trị là None nếu
+    câu hỏi không nhắc tới trang nào.
+    """
+    low = (text or "").lower()
+
+    for pattern in PAGE_RANGE_PATTERNS:
+        m = re.search(pattern, low)
+        if m:
+            a, b = int(m.group(1)), int(m.group(2))
+            return min(a, b), max(a, b), False
+
+    m = re.search(PAGE_SINGLE_PATTERN, low)
+    if m:
+        p = int(m.group(1))
+        return p, p, False
+
+    if any(k in low for k in WHOLE_DOC_KEYWORDS):
+        return None, None, True
+
+    return None, None, False
+
+
+def _is_scope_ambiguous(text: str, file_id: str) -> bool:
+    """
+    Chỉ hỏi lại khi thực sự không biết phải đọc tài liệu nào.
+
+    Phạm vi trang không còn là lý do để hỏi lại: nó được suy ra từ UI, từ chính
+    câu hỏi (_parse_page_scope), hoặc mặc định là toàn bộ tài liệu.
+    """
+    has_summary_intent = any(k in (text or "").lower() for k in SUMMARY_KEYWORDS)
+    return has_summary_intent and not file_id
 
 
 @app.route("/api/chat", methods=["POST"])
@@ -230,7 +267,8 @@ def api_chat():
         })
 
     # 2) Phạm vi chưa rõ -> hỏi lại thay vì đoán.
-    if _is_scope_ambiguous(message, file_id, page, page_from, page_to):
+    #    Chỉ còn hỏi lại khi chưa biết TÀI LIỆU nào; số trang thì tự suy ra bên dưới.
+    if _is_scope_ambiguous(message, file_id):
         clarification = _build_clarification_question(lib, message)
         return jsonify({
             "reply": clarification,
@@ -252,7 +290,9 @@ def api_chat():
             })
 
     # 4) Dựng ngữ cảnh slide thật cho model.
-    context_pages, context_label = _gather_context(lib, file_id, page, page_from, page_to)
+    context_pages, context_label = _gather_context(
+        lib, file_id, page, page_from, page_to, message=message
+    )
 
     if file_id and not context_pages:
         return jsonify({
@@ -287,8 +327,18 @@ def _build_clarification_question(lib: dict, message: str) -> str:
     )
 
 
-def _gather_context(lib, file_id, page, page_from, page_to, max_pages_no_range=1):
-    """Trả về (list[page_dict], label) — TOÀN BỘ text lấy thật từ slide, không sinh thêm."""
+MAX_PAGES_FALLBACK = int(os.environ.get("VLEARN_MAX_PAGES_FALLBACK", "40"))
+
+
+def _gather_context(lib, file_id, page, page_from, page_to, message=""):
+    """
+    Trả về (list[page_dict], label) — TOÀN BỘ text lấy thật từ slide, không sinh thêm.
+
+    Thứ tự ưu tiên khi xác định phạm vi trang:
+      1. Ô chọn trang trên UI (page_from/page_to, hoặc page).
+      2. Số trang viết thẳng trong câu hỏi ("tóm tắt từ trang 3 đến trang 7").
+      3. Mặc định: toàn bộ tài liệu (cắt bớt theo MAX_PAGES_FALLBACK / MAX_CONTEXT_CHARS).
+    """
     if not file_id:
         return [], ""
 
@@ -296,16 +346,33 @@ def _gather_context(lib, file_id, page, page_from, page_to, max_pages_no_range=1
     if not f:
         return [], ""
 
+    # (2) Nếu UI không cấp trang, đọc phạm vi từ chính câu hỏi.
+    if not page_from and not page_to and not page:
+        # wants_whole_doc: học viên nói "toàn bộ/cả bài" -> để rơi xuống nhánh mặc định
+        # (cả tài liệu), giống như khi không nhắc gì tới trang.
+        page_from, page_to, _ = _parse_page_scope(message)
+
     if page_from and page_to:
         pages = get_page_range(lib, file_id, int(page_from), int(page_to))
         label = f"{f['name']} — trang {page_from}–{page_to}"
+    elif page_from or page_to:
+        only = int(page_from or page_to)
+        p = get_page(lib, file_id, only)
+        pages = [p] if p else []
+        label = f"{f['name']} — trang {only}"
     elif page:
         p = get_page(lib, file_id, int(page))
         pages = [p] if p else []
         label = f"{f['name']} — trang {page}"
     else:
-        pages = f["pages"][:max_pages_no_range]
-        label = f"{f['name']} — trang {pages[0]['page'] if pages else '?'}"
+        # (3) Không ai nói gì về trang -> đưa cả tài liệu làm ngữ cảnh.
+        pages = f["pages"][:MAX_PAGES_FALLBACK]
+        if pages:
+            label = f"{f['name']} — trang {pages[0]['page']}–{pages[-1]['page']}"
+            if len(f["pages"]) > len(pages):
+                label += f" (toàn bộ {f['page_count']} trang, đã giới hạn {len(pages)} trang đầu)"
+        else:
+            label = f["name"]
 
     return pages, label
 

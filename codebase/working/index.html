@@ -242,6 +242,9 @@
   ::-webkit-scrollbar-track { background: transparent; }
 </style>
 </head>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
 <body>
 
 <div id="topbar">
@@ -351,7 +354,7 @@ const state = {
   pdfDoc: null,
   currentPage: 1,
   zoomMode: 'page-width', // page-fit | page-width | custom
-  scale: 1,               // scale thực đang render (1 = 100%)
+  scale: 0.4,               // scale thực đang render (1 = 100%)
   renderSeq: 0,           // token huỷ: mỗi lần re-render tăng lên
   renderTasks: [],        // canvas/text render task đang chạy, để cancel
 };
@@ -636,22 +639,20 @@ function addUserMessage(text) {
   chatEl.scrollTop = chatEl.scrollHeight;
 }
 
-function addAiMessage(text, { clarify = false, citations = [] } = {}) {
+function addAiMessage(text, { clarify = false } = {}) {
   const div = document.createElement('div');
   div.className = 'msg ai' + (clarify ? ' clarify' : '');
   const tag = clarify ? 'Cần làm rõ phạm vi' : 'VLearn Tutor';
-  let citeHtml = '';
-  if (citations && citations.length) {
-    citeHtml = '<div class="citations">' + citations.map(c =>
-      `<div>Trang ${c.page}: "${(c.excerpt || '').slice(0, 90)}${c.excerpt && c.excerpt.length > 90 ? '…' : ''}"</div>`
-    ).join('') + '</div>';
-  }
+  
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
-  bubble.textContent = text;
+  
+  // Sử dụng marked.parse() để chuyển đổi Markdown (**bold**, danh sách,...) sang HTML
+  bubble.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text;
+  
   div.innerHTML = `<span class="tag">${tag}</span>`;
   div.appendChild(bubble);
-  if (citeHtml) div.insertAdjacentHTML('beforeend', citeHtml);
+  
   chatEl.appendChild(div);
   chatEl.scrollTop = chatEl.scrollHeight;
 }

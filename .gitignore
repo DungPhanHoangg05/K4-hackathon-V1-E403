@@ -4,3 +4,4 @@ node_modules/
 codebase/working/__pycache__/
 data/vlearn-pack/.conversations
 data/vlearn-pack/.index_cache.json
+__pycache__/
