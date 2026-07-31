@@ -1,7 +1,7 @@
 # Reflection Cá Nhân — Hackathon AI (Mini Hackathon Batch 03 / K4)
 
 - **Họ và tên:** Ngô Nguyễn Khải Hưng  
-- **Mã học viên:** 23020382  
+- **Mã học viên:** 2A202601216  
 - **Nhóm:** V1-E403 · Zone 4  
 - **Dự án:** VLearn AI Companion — Tính năng: *Tóm tắt slide khi trễ bài*  
 - **Vai trò trong nhóm:** Evidence Lead & Data Mining Engineer  

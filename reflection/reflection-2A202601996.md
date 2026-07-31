@@ -1,5 +1,8 @@
 # Báo cáo công việc cá nhân
 
+- **Họ và tên:** Tòng Văn Tiến
+- **Mã học viên:** 2A202601996
+
 ## 1. Vai trò
 
 Phụ trách xây dựng giao diện trang **index** và thực hiện **khảo sát
